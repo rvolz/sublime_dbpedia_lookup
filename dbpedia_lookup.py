@@ -128,7 +128,7 @@ class DbpediaLookupCommand(sublime_plugin.TextCommand):
                 "http://localhost:8082",
             )
 
-        params = {"query": name, "maxResults": self.MAX_HITS}
+        params = {"query": name, "maxResults": self.MAX_HITS, "format": "JSON"}
         request = Request(
             host.rstrip("/") + "/api/search?" + urlencode(params),
             headers={"Accept": "application/json"},
