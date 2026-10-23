@@ -19,7 +19,31 @@ class DbpediaLookupReplaceResultsCommand(sublime_plugin.TextCommand):
         self.view.run_command("select_all")
         self.view.run_command("right_delete")
         self.view.insert(edit, 0, contents)
+        self.fold_property_lists()
         self.view.set_read_only(True)
+
+    def fold_property_lists(self):
+        text = self.view.substr(sublime.Region(0, self.view.size()))
+        offset = 0
+        list_start = None
+        list_end = None
+        previous_line_end = 0
+
+        for line in text.splitlines(True):
+            if line.startswith("      - "):
+                if list_start is None:
+                    # Begin folding at the end of the YAML key line so Sublime
+                    # puts the fold marker beside the key, not on the first item.
+                    list_start = previous_line_end
+                list_end = offset + len(line.rstrip("\r\n"))
+            elif list_start is not None:
+                self.view.fold(sublime.Region(list_start, list_end))
+                list_start = None
+            previous_line_end = offset + len(line.rstrip("\r\n"))
+            offset += len(line)
+
+        if list_start is not None:
+            self.view.fold(sublime.Region(list_start, list_end))
 
 
 class DbpediaLookupCommand(sublime_plugin.TextCommand):
@@ -54,12 +78,13 @@ class DbpediaLookupCommand(sublime_plugin.TextCommand):
 
         contents = self.output(documents, lookup_item)
         result_view = self.get_view()
+        result_view.set_syntax_file("Packages/YAML/YAML.sublime-syntax")
         result_view.run_command("dbpedia_lookup_replace_results", {"contents": contents})
 
         sublime.active_window().focus_view(result_view)
 
     def output(self, documents, lookup_item):
-        lines = ["Looked up: {}".format(lookup_item), ""]
+        lines = ["query: {}".format(self.yaml_scalar(lookup_item)), "results:"]
         for document in documents:
             if not isinstance(document, dict):
                 continue
@@ -68,19 +93,37 @@ class DbpediaLookupCommand(sublime_plugin.TextCommand):
                 document.get("id")
             )
             label = self.first_value(document.get("label")) or resource or "Result"
-            lines.append("{}: {}".format(label, resource or ""))
+            lines.append("  - label: {}".format(self.yaml_scalar(label)))
+            if resource:
+                lines.append("    uri: {}".format(self.yaml_scalar(resource)))
 
             description = self.first_value(document.get("comment"))
             if description:
-                lines.append("  description: {}".format(description))
+                lines.append("    description: {}".format(self.yaml_scalar(description)))
 
             for field, value in document.items():
                 if field in ("resource", "id", "label", "comment"):
                     continue
                 values = self.values(value)
                 if values:
-                    lines.append("  {}: {}".format(field, ", ".join(values)))
-            lines.append("")
+                    key = self.yaml_scalar(field)
+                    if field in ("score", "refCount"):
+                        numeric_value = self.numeric_value(values[0], field)
+                        lines.append(
+                            "    {}: {}".format(key, self.yaml_scalar(numeric_value))
+                        )
+                    elif isinstance(value, list):
+                        lines.append("    {}:".format(key))
+                        lines.extend(
+                            "      - {}".format(self.yaml_scalar(item))
+                            for item in values
+                        )
+                    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                        lines.append("    {}: {}".format(key, self.yaml_scalar(value)))
+                    else:
+                        lines.append(
+                            "    {}: {}".format(key, self.yaml_scalar(values[0]))
+                        )
 
         return "\n".join(lines).rstrip() + "\n"
 
@@ -99,6 +142,37 @@ class DbpediaLookupCommand(sublime_plugin.TextCommand):
                 values.append(unescape(text))
         return values
 
+    @staticmethod
+    def numeric_value(value, field):
+        """Convert numeric API fields, which may arrive as one-element string lists."""
+        try:
+            return int(value) if field == "refCount" else float(value)
+        except (TypeError, ValueError):
+            return value
+
+    @staticmethod
+    def yaml_scalar(value):
+        """Render a readable YAML string, quoting only ambiguous or unsafe values."""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)):
+            return str(value)
+        value = str(value)
+        ambiguous = re.match(
+            r"^(?:null|true|false|yes|no|on|off|[-+]?(?:[0-9].*|\.inf|\.nan))$",
+            value,
+            re.IGNORECASE,
+        )
+        unsafe = (
+            not value
+            or value != value.strip()
+            or value[0] in "-?:,[]{}#&*!|>'\"%@`"
+            or ": " in value
+            or re.search(r"\s#", value)
+            or any(ord(char) < 32 for char in value)
+        )
+        return json.dumps(value, ensure_ascii=False) if unsafe or ambiguous else value
+
     @classmethod
     def first_value(cls, value):
         values = cls.values(value)
@@ -114,6 +188,7 @@ class DbpediaLookupCommand(sublime_plugin.TextCommand):
         view.set_encoding("utf-8")
         view.set_name(self.VIEW_NAME)
         view.set_scratch(True)
+        view.set_syntax_file("Packages/YAML/YAML.sublime-syntax")
         return view
 
     def lookup(self, name):

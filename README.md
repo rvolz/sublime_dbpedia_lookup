@@ -17,7 +17,7 @@ The plugin provides a command in the context menu:
 * Right-click a selection and choose **DBpedia Lookup** to search the selection.
 * Right-click at a word and choose **DBpedia Lookup** to search that word.
 
-Results appear in a scratch view named **DBpedia Lookup**. Resource URIs are shown alongside labels and any other fields supplied by the server.
+Results appear as a YAML document in a scratch view named **DBpedia Lookup**. Resource URIs are shown with each label and are clickable in Sublime Text; other fields supplied by the server are included as YAML values.
 
 ## Server configuration
 
