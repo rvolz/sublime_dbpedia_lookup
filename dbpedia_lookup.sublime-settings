@@ -1,11 +1,11 @@
 //
-// Default values for dbpedia-lookup.sublime-settings
+// Default values for dbpedia_lookup.sublime-settings
 //
 {
     // Default server by DBpedia
-    "dbpedia_lookup_server_remote": "http://lookup.dbpedia.org",
-    // Local server, e.g. the Docker image provided by https://hub.docker.com/r/dbpedia/lookup/
-    "dbpedia_lookup_server_local": "http://localhost:1111",
+    "dbpedia_lookup_server_remote": "https://lookup.dbpedia.org",
+    // Local DBpedia Lookup server using https://hub.docker.com/r/dbpedia/lookup
+    "dbpedia_lookup_server_local": "http://akanthus.local:9083",
     // Which server should be used? "local" or "remote"?
     "default_server": "remote",
 }
