@@ -5,7 +5,7 @@
     // Default server by DBpedia
     "dbpedia_lookup_server_remote": "https://lookup.dbpedia.org",
     // Local DBpedia Lookup server using https://hub.docker.com/r/dbpedia/lookup
-    "dbpedia_lookup_server_local": "http://akanthus.local:9083",
+    "dbpedia_lookup_server_local": "http://localhost:8082",
     // Which server should be used? "local" or "remote"?
     "default_server": "remote",
 }
